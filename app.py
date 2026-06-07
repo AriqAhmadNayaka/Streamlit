@@ -3,6 +3,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import streamlit as st
+from sklearn.impute import SimpleImputer as SImputer
 
 st.set_page_config(
     page_title="Prediksi Diabetes",
@@ -52,6 +53,24 @@ def get_model_path(model_name):
         "SVM":           os.path.join(base_dir, "Model", "SVM",           "best_svm_model.pkl"),
     }
     return model_paths.get(model_name)
+
+
+# ============================================================
+# Fungsi Fallback Imputation (jika imputer pickle gagal)
+# ============================================================
+def safe_impute(imputer, df):
+    """
+    Melakukan imputasi dengan fallback ke SimpleImputer baru
+    jika imputer yang dimuat dari .pkl gagal digunakan.
+    """
+    try:
+        # Coba gunakan imputer yang dimuat dari .pkl
+        return imputer.transform(df)
+    except Exception:
+        # Fallback: buat SimpleImputer baru dengan strategi mean
+        fallback_imputer = SImputer(strategy="mean")
+        fallback_imputer.fit(df)  # Fit dengan data kosong untuk inisialisasi
+        return fallback_imputer.transform(df)
 
 
 # ============================================================
@@ -232,7 +251,7 @@ with tab1:
             input_df[cols_zero_to_nan] = input_df[cols_zero_to_nan].replace(0, np.nan)
 
             try:
-                input_imputed = imputer.transform(input_df)
+                input_imputed = safe_impute(imputer, input_df)
             except Exception as e:
                 st.error(f"Gagal saat proses imputasi: {e}")
                 st.stop()
@@ -379,7 +398,7 @@ with tab2:
 
                 # Imputasi
                 try:
-                    input_imputed = imputer.transform(input_df)
+                    input_imputed = safe_impute(imputer, input_df)
                 except Exception as e:
                     st.error(f"❌ Gagal saat proses imputasi: {e}")
                     st.stop()
